@@ -1,68 +1,96 @@
-from openai import OpenAI
-from config import OPENAI_API_KEY
+import os
 import random
+import requests
+from openai import OpenAI
+from PIL import Image, ImageDraw, ImageFont
 
+# Load OpenAI
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-def ask_gpt(prompt):
-    r = client.chat.completions.create(
+# Instagram config
+IG_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
+IG_ACCOUNT_ID = os.getenv("INSTAGRAM_ACCOUNT_ID")
+
+# ---------- TEXT AGENT ----------
+def generate_text():
+    prompt = """
+    Create a short, clean, non-offensive dark humour quote.
+    Style: romantic, funny, breakup, youth friendly.
+    No violence, no hate, no self-harm.
+    Make audience smile.
+    """
+
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.9,
+        max_tokens=60
     )
-    return r.choices[0].message.content.strip()
+
+    return response.choices[0].message.content.strip()
 
 
-def generate_idea():
-    prompt = """
-Generate 5 wholesome Instagram quote ideas.
-Themes: romantic warmth, healing breakup, cute humour, youth relatable, smile-inducing.
-Avoid sadness, hate, violence, self-harm.
-Return only one short idea.
-"""
-    return ask_gpt(prompt)
+# ---------- IMAGE AGENT ----------
+def generate_image(text):
+    img = Image.new("RGB", (1080, 1080), "black")
+    draw = ImageDraw.Draw(img)
+
+    colors = [
+        "red", "orange", "yellow", "green",
+        "blue", "indigo", "violet", "white"
+    ]
+
+    color = random.choice(colors)
+
+    try:
+        font = ImageFont.truetype("DejaVuSans-Bold.ttf", 70)
+    except:
+        font = ImageFont.load_default()
+
+    # Outline if black text
+    if color == "black":
+        draw.text((540, 540), text, font=font, fill="white", anchor="mm")
+    else:
+        draw.text((540, 540), text, font=font, fill=color, anchor="mm")
+
+    path = "post.png"
+    img.save(path)
+    return path
 
 
-def write_quote(idea):
-    prompt = f"""
-Write a short Instagram quote from idea:
+# ---------- INSTAGRAM AGENT ----------
+def post_to_instagram(image_path, caption):
+    # Step 1 — Upload image container
+    url = f"https://graph.facebook.com/v19.0/{IG_ACCOUNT_ID}/media"
 
-{idea}
+    with open(image_path, "rb") as img:
+        files = {"image_url": img}
+        data = {
+            "caption": caption,
+            "access_token": IG_TOKEN
+        }
+        res = requests.post(url, data=data)
 
-Rules:
-- Gentle dark aesthetic but positive
-- Smile-inducing
-- Youth friendly
-- Max 18 words
-- Clean language
-- May include 0–1 emoji randomly
-Avoid sadness, hate, violence, negativity.
-"""
-    return ask_gpt(prompt)
+    creation_id = res.json().get("id")
 
-
-def optimize_style(quote):
-    prompt = f"""
-Rewrite for Instagram readability:
-- Better rhythm
-- Emotional warmth
-- Max 2 lines
-Quote:
-{quote}
-"""
-    return ask_gpt(prompt)
+    # Step 2 — Publish
+    publish_url = f"https://graph.facebook.com/v19.0/{IG_ACCOUNT_ID}/media_publish"
+    data = {
+        "creation_id": creation_id,
+        "access_token": IG_TOKEN
+    }
+    requests.post(publish_url, data=data)
 
 
-def generate_caption(quote):
-    prompt = f"""
-Write Instagram caption for:
+# ---------- MAIN BOT FUNCTION ----------
+def run_bot():
+    print("🤖 Running bot...")
 
-{quote}
+    text = generate_text()
+    print("Generated text:", text)
 
-Style:
-- Warm, minimal
-- Add 5–7 hashtags
-- No cringe or spam
-- Youth friendly
-"""
-    return ask_gpt(prompt)
+    image = generate_image(text)
+    print("Image created")
+
+    post_to_instagram(image, text)
+    print("Posted to Instagram successfully ✅")
