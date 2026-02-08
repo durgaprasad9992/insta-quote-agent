@@ -1,0 +1,7 @@
+openai>=1.0.0
+pillow
+requests
+python-dotenv
+cloudinary
+schedule
+textblob
