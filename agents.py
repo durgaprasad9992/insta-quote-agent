@@ -57,6 +57,77 @@ def generate_text():
 
 
 # ==============================
+# HOOK GENERATOR
+# ==============================
+
+def generate_hook():
+    hooks = [
+        "This hit harder than expected...",
+        "Only real ones understand this...",
+        "Read this slowly...",
+        "Why is this so true?",
+        "This hurts but it's funny 😂",
+        "You didn’t expect this...",
+        "Relatable or just me?",
+        "Late night thoughts hit different...",
+        "Some truths are funny...",
+        "Don’t read if you're emotional..."
+    ]
+    return random.choice(hooks)
+
+
+# ==============================
+# HASHTAG GENERATOR
+# ==============================
+
+def generate_hashtags(text):
+    prompt = f"""
+    Generate 20 viral Instagram hashtags for this quote:
+    "{text}"
+
+    Niche: relatable, love, breakup, humour, youth.
+    Return only hashtags.
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=100
+        )
+
+        return response.choices[0].message.content.strip()
+
+    except:
+        return """#relatable #lovequotes #breakupquotes #funnyquotes #deepthoughts
+#sadquotes #relationshipgoals #youthlife #heartbroken #datinglife
+#funnyreels #lovememes #explorepage #viralquotes #singlelife
+#modernlove #relationshiphumor #nightthoughts #emotional #trending"""
+
+
+# ==============================
+# CAPTION GENERATOR
+# ==============================
+
+def generate_caption(text):
+    hook = generate_hook()
+    hashtags = generate_hashtags(text)
+
+    caption = f"""
+{hook}
+
+{text}
+
+❤️ Double tap if relatable  
+💬 Comment: TRUE or NOT?  
+📩 Share with someone  
+
+{hashtags}
+"""
+    return caption.strip()
+
+
+# ==============================
 # IMAGE AGENT
 # ==============================
 
@@ -136,12 +207,15 @@ def post_to_instagram(image_path, caption):
 # ==============================
 
 def run_bot():
-    print("🤖 Running Instagram AI Bot...")
+    print("🤖 Running Viral Instagram Bot...")
 
     text = generate_text()
-    print("📝 Generated text:", text)
+    print("📝 Quote:", text)
+
+    caption = generate_caption(text)
+    print("📢 Caption created")
 
     image = generate_image(text)
-    print("🖼 Image created")
+    print("🖼 Image ready")
 
-    post_to_instagram(image, text)
+    post_to_instagram(image, caption)
