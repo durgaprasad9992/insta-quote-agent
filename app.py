@@ -1,25 +1,26 @@
-from agents import *
-from safety import is_safe
-from image_gen import create_post
-from uploader_cloudinary import upload_image
-from instagram_api import post_to_instagram
+from agents import run_bot
+import schedule
+import time
+import traceback
 
+print("🚀 Instagram AI Bot Started...")
 
-def run_pipeline():
+# Run immediately when container starts
+try:
+    run_bot()
+except Exception as e:
+    print("Error in first run:", e)
+    traceback.print_exc()
 
-    idea = generate_idea()
-    quote = write_quote(idea)
+# Run every 6 hours
+schedule.every(6).hours.do(run_bot)
 
-    if not is_safe(quote):
-        print("Unsafe quote skipped")
-        return
-
-    quote = optimize_style(quote)
-    caption = generate_caption(quote)
-
-    image_path = create_post(quote)
-    image_url = upload_image(image_path)
-
-    post_to_instagram(image_url, caption)
-
-    print("Posted successfully")
+# Keep container alive forever
+while True:
+    try:
+        schedule.run_pending()
+        time.sleep(60)
+    except Exception as e:
+        print("Scheduler error:", e)
+        traceback.print_exc()
+        time.sleep(60)
