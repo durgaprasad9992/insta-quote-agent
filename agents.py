@@ -4,13 +4,14 @@ import time
 import base64
 import requests
 from io import BytesIO
-from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from openai import OpenAI
+from dotenv import load_dotenv
 
 # =========================
-# ENV
+# Load environment
 # =========================
+load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 IG_ACCOUNT_ID = os.getenv("INSTAGRAM_ACCOUNT_ID")
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
@@ -19,7 +20,7 @@ IMGBB_API_KEY = os.getenv("IMGBB_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # =========================
-# BACKGROUNDS
+# Backgrounds
 # =========================
 BACKGROUNDS = {
     "romantic": [
@@ -39,7 +40,7 @@ BACKGROUNDS = {
 }
 
 # =========================
-# Poet AI
+# Generate poetic quote
 # =========================
 def generate_poetic_quote(mood=None):
     mood_text = f"mood: {mood}" if mood else ""
@@ -60,7 +61,7 @@ def generate_poetic_quote(mood=None):
         return "I never planned on loving you… yet here I am, smiling like an idiot."
 
 # =========================
-# Background Selection
+# Pick background
 # =========================
 def pick_background(quote):
     q = quote.lower()
@@ -73,31 +74,46 @@ def pick_background(quote):
     return random.choice(BACKGROUNDS["flirty"])
 
 # =========================
-# Image Generator
+# Create image
 # =========================
 def create_quote_image(quote, filename="quote.jpg"):
     bg_url = pick_background(quote)
     response = requests.get(bg_url + "?w=1080&h=1080&fit=crop")
     img = Image.open(BytesIO(response.content)).convert("RGB")
     img = img.resize((1080,1080))
+
+    # Blur + overlay
     img = img.filter(ImageFilter.GaussianBlur(1))
     overlay = Image.new("RGBA", img.size, (0,0,0,120))
     img = Image.alpha_composite(img.convert("RGBA"), overlay)
+
     draw = ImageDraw.Draw(img)
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    font = ImageFont.truetype(font_path, 80)
+
+    # ---------- FONT ----------
+    font_path = os.path.join("fonts", "Montserrat-Bold.ttf")
+    font_size = 80
+    try:
+        font = ImageFont.truetype(font_path, font_size)
+    except OSError:
+        print("⚠️ Bundled font not found, using default PIL font")
+        font = ImageFont.load_default()
+
     import textwrap
     wrapped = textwrap.fill(quote, width=18)
     bbox = draw.multiline_textbbox((0,0), wrapped, font=font, align="center")
-    x = (1080 - (bbox[2]-bbox[0]))//2
-    y = (1080 - (bbox[3]-bbox[1]))//2
+    x = (1080 - (bbox[2]-bbox[0])) // 2
+    y = (1080 - (bbox[3]-bbox[1])) // 2
+
+    # Shadow
     draw.multiline_text((x+3, y+3), wrapped, font=font, fill=(0,0,0), align="center")
+    # Main text
     draw.multiline_text((x, y), wrapped, font=font, fill=(255,255,255), align="center")
+
     img.save(filename, quality=95)
     return filename
 
 # =========================
-# Caption Generator
+# Generate caption
 # =========================
 def generate_caption(quote):
     hooks = [
@@ -127,7 +143,7 @@ def upload_to_imgbb(filename):
     return None
 
 # =========================
-# Instagram Post
+# Post to Instagram
 # =========================
 def post_to_instagram(img_url, caption):
     if not IG_ACCOUNT_ID or not ACCESS_TOKEN:
@@ -147,11 +163,13 @@ def post_to_instagram(img_url, caption):
             data={"creation_id": creation_id,"access_token":ACCESS_TOKEN}
         )
         print("📤 Posted successfully!")
+        return creation_id
     except Exception as e:
         print("❌ Instagram error:", e)
+        return None
 
 # =========================
-# Auto-Engagement AI
+# Auto-reply comments
 # =========================
 def auto_reply_comments(post_id):
     try:
@@ -176,7 +194,7 @@ def auto_reply_comments(post_id):
         print("⚠️ Comment AI error:", e)
 
 # =========================
-# Smart Scheduler
+# Scheduler
 # =========================
 POST_INTERVALS = [4,6,8] # hours between posts
 
@@ -188,12 +206,9 @@ def run_bot():
         caption = generate_caption(quote)
         img_url = upload_to_imgbb(filename)
         if img_url:
-            post_to_instagram(img_url, caption)
-            # Auto-reply (optional)
-            # auto_reply_comments(post_id)  # Uncomment and implement post_id tracking
+            post_id = post_to_instagram(img_url, caption)
+            if post_id:
+                auto_reply_comments(post_id)
         wait_hours = random.choice(POST_INTERVALS)
         print(f"⏳ Next post in {wait_hours} hours...\n")
         time.sleep(wait_hours*3600)
-
-if __name__ == "__main__":
-    run_bot()
