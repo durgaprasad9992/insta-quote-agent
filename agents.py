@@ -1,221 +1,142 @@
 import os
+import time
 import random
 import requests
 from openai import OpenAI
-from PIL import Image, ImageDraw, ImageFont
 
 # ==============================
-# CONFIG
+# ENV VARIABLES
 # ==============================
-
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-IG_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
 IG_ACCOUNT_ID = os.getenv("INSTAGRAM_ACCOUNT_ID")
+ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
+# ==============================
+# FALLBACK QUOTES (if OpenAI quota exceeded)
+# ==============================
+FALLBACK_QUOTES = [
+    "You stole my heart… please return, EMI pending 💸",
+    "Life is short. Make your WiFi strong 📶",
+    "Success is simple — wake up, work, repeat 🔁",
+    "Dream big. Start small. Act now 🚀",
+    "Money can't buy happiness… but it buys pizza 🍕"
+]
 
 # ==============================
-# TEXT AGENT (SAFE + FALLBACK)
+# GENERATE VIRAL TEXT
 # ==============================
-
 def generate_text():
-    prompt = """
-    Create a short, clean, non-offensive dark humour quote.
-    Style: romantic, funny, breakup, youth friendly.
-    No violence, no hate, no self-harm.
-    Make audience smile.
-    Keep under 15 words.
-    """
+    prompt = "Create a short, funny, viral Instagram quote (max 12 words)."
 
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=60
+            max_tokens=40,
         )
-        return response.choices[0].message.content.strip()
+        text = response.choices[0].message.content.strip()
+        print("📝 Quote:", text)
+        return text
 
     except Exception as e:
         print("⚠️ OpenAI error:", e)
-
-        # Fallback quotes (bot will NEVER crash)
-        fallback_quotes = [
-            "Love is temporary, WiFi is forever 😌",
-            "We broke up… but Netflix still asks 'Continue watching?'",
-            "My heart said gym, my brain said pizza 🍕",
-            "Crush replied 'haha'… wedding cancelled 💔😂",
-            "Relationship status: Typing… deleting… typing again 😅",
-            "She said 'be yourself'… now she's ignoring me 😂",
-            "Love hurts… especially when seen at 2:17 AM",
-            "I fell for you… gravity still laughing 🤦‍♂️",
-            "You stole my heart… please return, EMI pending 💸",
-            "Text me back or I start my villain era 😌"
-        ]
-
-        return random.choice(fallback_quotes)
+        fallback = random.choice(FALLBACK_QUOTES)
+        print("📝 Using fallback quote:", fallback)
+        return fallback
 
 
 # ==============================
-# HOOK GENERATOR
+# GENERATE CAPTION + HASHTAGS
 # ==============================
-
-def generate_hook():
-    hooks = [
-        "This hit harder than expected...",
-        "Only real ones understand this...",
-        "Read this slowly...",
-        "Why is this so true?",
-        "This hurts but it's funny 😂",
-        "You didn’t expect this...",
-        "Relatable or just me?",
-        "Late night thoughts hit different...",
-        "Some truths are funny...",
-        "Don’t read if you're emotional..."
+def generate_caption(quote):
+    hashtags = [
+        "#viral", "#trending", "#motivation", "#success",
+        "#mindset", "#quotes", "#explore", "#instagood",
+        "#life", "#growth", "#reels", "#ai"
     ]
-    return random.choice(hooks)
+    random.shuffle(hashtags)
+    caption = f"{quote}\n\n{' '.join(hashtags[:8])}"
+    print("📢 Caption created")
+    return caption
 
 
 # ==============================
-# HASHTAG GENERATOR
+# GET RANDOM IMAGE (FREE SOURCE)
 # ==============================
-
-def generate_hashtags(text):
-    prompt = f"""
-    Generate 20 viral Instagram hashtags for this quote:
-    "{text}"
-
-    Niche: relatable, love, breakup, humour, youth.
-    Return only hashtags.
-    """
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=100
-        )
-
-        return response.choices[0].message.content.strip()
-
-    except:
-        return """#relatable #lovequotes #breakupquotes #funnyquotes #deepthoughts
-#sadquotes #relationshipgoals #youthlife #heartbroken #datinglife
-#funnyreels #lovememes #explorepage #viralquotes #singlelife
-#modernlove #relationshiphumor #nightthoughts #emotional #trending"""
+def generate_image():
+    # Free random high-quality image
+    image_url = f"https://picsum.photos/1080?random={random.randint(1,999999)}"
+    print("🖼 Image ready:", image_url)
+    return image_url
 
 
 # ==============================
-# CAPTION GENERATOR
+# POST TO INSTAGRAM
 # ==============================
-
-def generate_caption(text):
-    hook = generate_hook()
-    hashtags = generate_hashtags(text)
-
-    caption = f"""
-{hook}
-
-{text}
-
-❤️ Double tap if relatable  
-💬 Comment: TRUE or NOT?  
-📩 Share with someone  
-
-{hashtags}
-"""
-    return caption.strip()
-
-
-# ==============================
-# IMAGE AGENT
-# ==============================
-
-def generate_image(text):
-    img = Image.new("RGB", (1080, 1080), "black")
-    draw = ImageDraw.Draw(img)
-
-    vibgyor_colors = [
-        "red", "orange", "yellow",
-        "green", "blue", "indigo", "violet"
-    ]
-
-    color = random.choice(vibgyor_colors)
-
-    try:
-        font = ImageFont.truetype("DejaVuSans-Bold.ttf", 70)
-    except:
-        font = ImageFont.load_default()
-
-    # Center text
-    x, y = 540, 540
-
-    # White outline if dark color
-    if color == "black":
-        for dx in [-2, 2]:
-            for dy in [-2, 2]:
-                draw.text((x+dx, y+dy), text, font=font, fill="white", anchor="mm")
-
-    draw.text((x, y), text, font=font, fill=color, anchor="mm")
-
-    path = "post.png"
-    img.save(path)
-    return path
-
-
-# ==============================
-# INSTAGRAM POST AGENT
-# ==============================
-
-def post_to_instagram(image_path, caption):
-    print("📤 Uploading to Instagram...")
-
-    url = f"https://graph.facebook.com/v19.0/{IG_ACCOUNT_ID}/media"
-
-    data = {
-        "caption": caption,
-        "access_token": IG_TOKEN
-    }
-
-    # NOTE: Instagram Graph API usually requires a public image URL.
-    # If your posting works, keep. If not, we will fix later.
-    res = requests.post(url, data=data)
-
-    if "id" not in res.json():
-        print("❌ Instagram upload failed:", res.text)
+def post_to_instagram(image_url, caption):
+    if not IG_ACCOUNT_ID or not ACCESS_TOKEN:
+        print("❌ Missing Instagram credentials")
         return
 
-    creation_id = res.json()["id"]
+    try:
+        # Step 1 — Create media container
+        url = f"https://graph.facebook.com/v19.0/{IG_ACCOUNT_ID}/media"
+        payload = {
+            "image_url": image_url,
+            "caption": caption,
+            "access_token": ACCESS_TOKEN
+        }
 
-    publish_url = f"https://graph.facebook.com/v19.0/{IG_ACCOUNT_ID}/media_publish"
+        r = requests.post(url, data=payload)
+        data = r.json()
 
-    data = {
-        "creation_id": creation_id,
-        "access_token": IG_TOKEN
-    }
+        if "id" not in data:
+            print("❌ Media creation failed:", data)
+            return
 
-    res2 = requests.post(publish_url, data=data)
+        creation_id = data["id"]
+        print("✅ Media container created")
 
-    if res2.status_code == 200:
-        print("✅ Posted successfully!")
-    else:
-        print("❌ Publish failed:", res2.text)
+        # Step 2 — Publish
+        publish_url = f"https://graph.facebook.com/v19.0/{IG_ACCOUNT_ID}/media_publish"
+        payload = {
+            "creation_id": creation_id,
+            "access_token": ACCESS_TOKEN
+        }
+
+        r = requests.post(publish_url, data=payload)
+        print("📤 Publish response:", r.json())
+
+    except Exception as e:
+        print("❌ Instagram error:", e)
 
 
 # ==============================
-# MAIN BOT
+# MAIN BOT LOOP
 # ==============================
-
 def run_bot():
-    print("🤖 Running Viral Instagram Bot...")
+    print("🚀 Bot started")
 
-    text = generate_text()
-    print("📝 Quote:", text)
+    while True:
+        try:
+            quote = generate_text()
+            caption = generate_caption(quote)
+            image_url = generate_image()
 
-    caption = generate_caption(text)
-    print("📢 Caption created")
+            print("📤 Uploading to Instagram...")
+            post_to_instagram(image_url, caption)
 
-    image = generate_image(text)
-    print("🖼 Image ready")
+        except Exception as e:
+            print("❌ Bot error:", e)
 
-    post_to_instagram(image, caption)
+        print("⏳ Waiting 6 hours for next post...\n")
+        time.sleep(21600)  # 6 hours
+
+
+# ==============================
+# START BOT
+# ==============================
+if __name__ == "__main__":
+    run_bot()
