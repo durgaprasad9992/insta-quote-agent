@@ -1,7 +1,8 @@
-openai>=1.0.0
+openai
 pillow
 requests
 python-dotenv
 cloudinary
 schedule
 textblob
+
