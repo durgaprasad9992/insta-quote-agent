@@ -109,6 +109,8 @@ def create_quote_image(quote, filename="quote.jpg"):
     # Main text
     draw.multiline_text((x, y), wrapped, font=font, fill=(255,255,255), align="center")
 
+    # Convert to RGB before saving JPEG
+    img = img.convert("RGB")
     img.save(filename, quality=95)
     return filename
 
