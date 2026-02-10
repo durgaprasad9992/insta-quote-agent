@@ -3,7 +3,7 @@ import random
 import time
 import requests
 from io import BytesIO
-from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance, UnidentifiedImageError
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -27,7 +27,7 @@ GRAPH_API_VERSION = "v24.0"
 BASE_URL = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
 
 # =========================
-# Pick dynamic vibrant background
+# Pick dynamic vibrant background with retries
 # =========================
 def pick_background(quote, width=1080, height=1080):
     import urllib.parse
@@ -49,9 +49,22 @@ def pick_background(quote, width=1080, height=1080):
     }
     search_query = urllib.parse.quote(query_map[mood])
 
-    # Unsplash random image
     unsplash_url = f"https://source.unsplash.com/{width}x{height}/?{search_query}"
-    return unsplash_url
+
+    # Try fetching until we get a valid image
+    for attempt in range(3):
+        response = requests.get(unsplash_url)
+        try:
+            img = Image.open(BytesIO(response.content))
+            return unsplash_url  # Return URL if valid
+        except UnidentifiedImageError:
+            print(f"⚠️ Unsplash fetch failed, retrying... ({attempt+1}/3)")
+            time.sleep(1)
+
+    # Fallback to placeholder
+    print("⚠️ Using fallback black background")
+    fallback_url = f"https://via.placeholder.com/{width}x{height}/000000/FFFFFF/?text=Love+Quote"
+    return fallback_url
 
 # =========================
 # Generate poetic/flirty quote
@@ -80,7 +93,11 @@ def generate_poetic_quote(mood=None):
 def create_quote_image(quote, filename="quote.jpg"):
     bg_url = pick_background(quote)
     response = requests.get(bg_url)
-    img = Image.open(BytesIO(response.content)).convert("RGB")
+    try:
+        img = Image.open(BytesIO(response.content)).convert("RGB")
+    except UnidentifiedImageError:
+        # fallback solid color
+        img = Image.new("RGB", (1080,1080), color=(0,0,0))
     img = img.resize((1080,1080))
     img = img.filter(ImageFilter.GaussianBlur(1))
 
